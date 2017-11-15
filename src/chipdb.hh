@@ -130,11 +130,11 @@ obstream &operator<<(obstream &obs, const Switch &sw);
 ibstream &operator>>(ibstream &ibs, Switch &sw);
 
 enum class TileType : int {
-  EMPTY, IO, LOGIC, RAMB, RAMT,
+  EMPTY, IO, LOGIC, RAMB, RAMT, DSP0, DSP1, DSP2, DSP3, IPCON
 };
 
 enum class CellType : int {
-  LOGIC, IO, GB, RAM, WARMBOOT, PLL,
+  LOGIC, IO, GB, RAM, WARMBOOT, PLL, MAC16, SPRAM, LFOSC, HFOSC, RGBA_DRV, LEDDA_IP, I2C_IP, SPI_IP
 };
 
 std::string cell_type_name(CellType ct);
