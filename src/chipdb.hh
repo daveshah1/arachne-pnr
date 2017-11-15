@@ -157,7 +157,7 @@ constexpr int cell_type_idx(CellType type)
   return static_cast<int>(type);
 }
 
-static const int n_cell_types = cell_type_idx(CellType::PLL) + 1;
+static const int n_cell_types = cell_type_idx(CellType::SPI_IP) + 1;
 
 inline obstream &operator<<(obstream &obs, CellType t)
 {

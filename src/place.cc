@@ -163,6 +163,22 @@ Placer::gate_cell_type(int g)
     return CellType::WARMBOOT;
   else if (models.is_pllX(inst))
     return CellType::PLL;
+  else if (models.is_mac16(inst))
+    return CellType::MAC16;
+  else if (models.is_spram(inst))
+    return CellType::SPRAM;
+  else if (models.is_hfosc(inst))
+    return CellType::HFOSC;
+  else if (models.is_lfosc(inst))
+    return CellType::LFOSC;
+  else if (models.is_rgba_drv(inst))
+    return CellType::RGBA_DRV;
+  else if (models.is_ledda_ip(inst))
+    return CellType::LEDDA_IP;
+  else if (models.is_i2c(inst))
+    return CellType::I2C_IP;
+  else if (models.is_spi(inst))
+    return CellType::SPI_IP;
   else
     {
       assert(models.is_ramX(inst));
@@ -404,6 +420,20 @@ Placer::inst_drives_global(Instance *inst, int c, int glb)
       assert(chipdb->gbufin.at(std::make_pair(x, y)) == glb);
       return true;
     }
+  
+  if (models.is_hfosc(inst)
+    && inst->find_port("CLKHF")->connected()) {
+    //TODO: don't hardcode GLB
+    if(glb == 4)
+      return true;
+  }
+  
+  if (models.is_lfosc(inst)
+    && inst->find_port("CLKLF")->connected()) {
+    //TODO: don't hardcode GLB
+    if(glb == 5)
+      return true;
+  }
   
   if (models.is_pllX(inst))
     {
@@ -681,7 +711,9 @@ Placer::valid(int t)
         }
     }
   else
-    assert(chipdb->tile_type[t] == TileType::RAMT);
+    assert((chipdb->tile_type[t] == TileType::RAMT) ||
+           (chipdb->tile_type[t] == TileType::DSP0) ||
+           (chipdb->tile_type[t] == TileType::IPCON));
   
   return true;
 }
