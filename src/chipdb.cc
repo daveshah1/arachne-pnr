@@ -1122,7 +1122,12 @@ CBit
 ChipDB::extra_cell_cbit(int c, const std::string &name) const
 {
   const auto &p = cell_mfvs.at(c).at(name);
-  const auto &cbits = tile_nonrouting_cbits.at(tile_type[p.first]).at(std::string("PLL.") + p.second);
+  std::string prefix = "PLL.";
+  if((tile_type[p.first] == TileType::DSP0) || (tile_type[p.first] == TileType::DSP1) ||
+     (tile_type[p.first] == TileType::DSP2) || (tile_type[p.first] == TileType::DSP3) ||
+     (tile_type[p.first] == TileType::IPCON))
+     prefix = "IpConfig.";
+  const auto &cbits = tile_nonrouting_cbits.at(tile_type[p.first]).at(prefix + p.second);
   assert(cbits.size() == 1);
   const CBit &cbit0 = cbits[0];
   return cbit0.with_tile(p.first);

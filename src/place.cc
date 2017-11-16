@@ -139,6 +139,16 @@ public:
                     bool pullup);
   void configure();
   
+  //Configure a specific extra cell, given a list of the
+  //parameters it takes in the form of a name and a size
+  //If string_style is true, then it uses the "alternative 
+  //Lattice style" where parameters are a string like "0b000111" 
+  //rather than a numeric constant
+  void configure_extra_cell(int c,
+                            Instance *inst,
+                            const std::vector<std::pair<std::string, int> > &params,
+                            bool string_style);
+  
 #ifndef NDEBUG
   void check();
 #endif
@@ -1326,6 +1336,50 @@ Placer::configure_io(const Location &loc,
   }
 }
 
+void 
+Placer::configure_extra_cell(int c,
+                             Instance *inst,
+                             const std::vector<std::pair<std::string, int> > &params,
+                             bool string_style)
+{
+  for(auto p : params) {
+    //TODO: default value? or is this done in Verilog library?
+    BitVector value;
+    if(string_style) {
+      //Lattice's weird string style params (as of yet untested), not sure if
+      //prefixes other than 0b should be supported, only 0b features in docs
+      std::string raw = inst->get_param(p.first).as_string();
+      assert(raw.substr(0, 2) == "0b");
+      raw = raw.substr(2);
+      value.resize(raw.length());
+      for(int i = 0; i < (int)raw.length(); i++) {
+        if(raw[i] == '1') {
+          value[(raw.length() - 1) - i] = 1;
+        } else {
+          assert(raw[i] == '0');
+          value[(raw.length() - 1) - i] = 0;
+        }
+      }
+    } else {
+      value = inst->get_param(p.first).as_bits();
+    }
+    
+    value.resize(p.second);
+    if(p.second == 1) {
+      CBit cb = chipdb->extra_cell_cbit(c, p.first);
+      conf.set_cbit(cb, value[0]);
+    } else {
+      for (int i = 0; i < (int)p.second; ++i)
+        {
+          CBit cb = chipdb->extra_cell_cbit(c, fmt((p.first + std::string("_")) << i));
+          conf.set_cbit(cb, value[i]);
+        }
+    }
+
+  }
+
+}
+
 void
 Placer::configure()
 {
@@ -1485,7 +1539,35 @@ Placer::configure()
                                ramb_negclk.col),
                           true);
         }
-      else
+      else if (models.is_mac16(inst)) {
+        const std::vector<std::pair<std::string, int> > mac16_params = 
+          {{"C_REG", 1}, {"A_REG", 1}, {"B_REG", 1}, {"D_REG", 1},
+           {"TOP_8x8_MULT_REG", 1}, {"BOT_8x8_MULT_REG", 1},
+           {"PIPELINE_16x16_MULT_REG1", 1}, {"PIPELINE_16x16_MULT_REG2", 1},
+           {"TOPOUTPUT_SELECT", 2}, {"TOPADDSUB_LOWERINPUT", 2},
+           {"TOPADDSUB_UPPERINPUT", 1}, {"TOPADDSUB_CARRYSELECT", 2},
+           {"BOTOUTPUT_SELECT", 2}, {"BOTADDSUB_LOWERINPUT", 2},
+           {"BOTADDSUB_UPPERINPUT", 1}, {"BOTADDSUB_CARRYSELECT", 2},
+           {"MODE_8x8", 1}, {"A_SIGNED", 1}, {"B_SIGNED", 1}};
+        configure_extra_cell(cell, inst, mac16_params, false);
+      } else if(models.is_hfosc(inst)) {
+        const std::vector<std::pair<std::string, int> > hfosc_params =
+          {{"CLKHF_DIV", 2}};
+        configure_extra_cell(cell, inst, hfosc_params, true);
+      } else if(models.is_lfosc(inst)) {
+        //nothing to configure
+      } else if(models.is_spram(inst)) {
+        CBit spramen_cb = chipdb->extra_cell_cbit(cell, "SPRAM_ENABLE");
+        conf.set_cbit(spramen_cb, true);
+      } else if(models.is_rgba_drv(inst)) {
+        const std::vector<std::pair<std::string, int> > rgbadrv_params =
+          {{"CURRENT_MODE", 1}, {"RGB0_CURRENT", 6},
+           {"RGB1_CURRENT", 6}, {"RGB2_CURRENT", 6}};
+        configure_extra_cell(cell, inst, rgbadrv_params, true);     
+        
+        CBit rgben_cb = chipdb->extra_cell_cbit(cell, "RGBA_DRV_EN");
+        conf.set_cbit(rgben_cb, true);
+      } else
         {
           assert(models.is_pllX(inst));
           
