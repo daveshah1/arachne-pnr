@@ -1558,6 +1558,8 @@ Placer::configure()
         configure_extra_cell(cell, inst, mac16_params, false);
         int x = chipdb->tile_x(loc.tile()),
           y = chipdb->tile_y(loc.tile());
+        //Used DSP tiles must have LC and cascade bits set correctly to function, as these are
+        //used for an unknown internal purpose
         for(int dsp_idx = 0; dsp_idx < 4; dsp_idx++) {
           const auto &dspi_func_cbits = chipdb->tile_nonrouting_cbits.at(TileType::DSP0);
           int dspt = chipdb->tile(x, y + dsp_idx);
@@ -1951,6 +1953,36 @@ Placer::configure()
           }
       }
   }
+  
+  // All but one IpCon tile has LC_ and Cascade bits set, like DSP tiles
+  for (int t = 0; t < chipdb->n_tiles; ++t)
+    {
+      if (chipdb->tile_type[t] != TileType::IPCON)
+        continue;
+      
+      assert(chipdb->device == "5k");
+      if(chipdb->tile_x(t) == 25 && chipdb->tile_y(t) == 14)
+        continue; //Bits not set on this tile only
+      
+      const auto &ipcon_func_cbits = chipdb->tile_nonrouting_cbits.at(TileType::IPCON);
+      for(int lc_idx = 0; lc_idx < 8; lc_idx++) {
+        const auto &cbits = ipcon_func_cbits.at(fmt("LC_" << lc_idx));
+        static std::vector<int> ipc_lut_perm = {
+          4, 14, 15, 5, 6, 16, 17, 7, 3, 13, 12, 2, 1, 11, 10, 0,
+        };
+        for (int i = 0; i < 16; ++i)
+          conf.set_cbit(CBit(t,
+                             cbits[ipc_lut_perm[i]].row,
+                             cbits[ipc_lut_perm[i]].col),
+                        ((i % 8) >= 4));
+        const auto &casc_cbit = ipcon_func_cbits.at("Cascade.IPCON_LC0" + std::to_string(lc_idx) + "_inmux02_5");
+        assert(casc_cbit.size() == 1);
+        conf.set_cbit(CBit(t,
+                           casc_cbit[0].row,
+                           casc_cbit[0].col),
+                      1);
+      }  
+    }
   
   // set RamConfig.PowerUp configuration bit
   if (chipdb->tile_nonrouting_cbits.count(TileType::RAMB))
