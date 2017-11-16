@@ -248,7 +248,7 @@ public:
     tile_nonrouting_cbits;
   
   CBit extra_cell_cbit(int ec, const std::string &name) const;
-  
+  std::string extra_cell_netname(int ec, const std::string &name) const;
   int n_cells;
   BasedVector<CellType, 1> cell_type;
   BasedVector<Location, 1> cell_location;

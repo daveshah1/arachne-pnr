@@ -433,16 +433,22 @@ Placer::inst_drives_global(Instance *inst, int c, int glb)
   
   if (models.is_hfosc(inst)
     && inst->find_port("CLKHF")->connected()) {
-    //TODO: don't hardcode GLB
-    if(glb == 4)
-      return true;
+      std::string netname = chipdb->extra_cell_netname(c, "CLKHF");
+      const std::string prefix = "glb_netwk_";
+      assert(netname.substr(0, prefix.length()) == prefix);
+      int driven_glb = std::stoi(netname.substr(prefix.length()));
+      if(glb == driven_glb)
+        return true;
   }
   
   if (models.is_lfosc(inst)
     && inst->find_port("CLKLF")->connected()) {
-    //TODO: don't hardcode GLB
-    if(glb == 5)
-      return true;
+      std::string netname = chipdb->extra_cell_netname(c, "CLKLF");
+      const std::string prefix = "glb_netwk_";
+      assert(netname.substr(0, prefix.length()) == prefix);
+      int driven_glb = std::stoi(netname.substr(prefix.length()));
+      if(glb == driven_glb)
+        return true;
   }
   
   if (models.is_pllX(inst))

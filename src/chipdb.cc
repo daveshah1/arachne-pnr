@@ -1132,3 +1132,10 @@ ChipDB::extra_cell_cbit(int c, const std::string &name) const
   const CBit &cbit0 = cbits[0];
   return cbit0.with_tile(p.first);
 }
+
+std::string
+ChipDB::extra_cell_netname(int c, const std::string &name) const
+{
+  const auto &p = cell_mfvs.at(c).at(name);
+  return p.second;
+}
