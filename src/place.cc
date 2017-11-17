@@ -433,20 +433,14 @@ Placer::inst_drives_global(Instance *inst, int c, int glb)
   
   if (models.is_hfosc(inst)
     && inst->find_port("CLKHF")->connected()) {
-      std::string netname = chipdb->extra_cell_netname(c, "CLKHF");
-      const std::string prefix = "glb_netwk_";
-      assert(netname.substr(0, prefix.length()) == prefix);
-      int driven_glb = std::stoi(netname.substr(prefix.length()));
+      int driven_glb = chipdb->get_oscillator_glb(c, "CLKHF");
       if(glb == driven_glb)
         return true;
   }
   
   if (models.is_lfosc(inst)
     && inst->find_port("CLKLF")->connected()) {
-      std::string netname = chipdb->extra_cell_netname(c, "CLKLF");
-      const std::string prefix = "glb_netwk_";
-      assert(netname.substr(0, prefix.length()) == prefix);
-      int driven_glb = std::stoi(netname.substr(prefix.length()));
+      int driven_glb = chipdb->get_oscillator_glb(c, "CLKLF");
       if(glb == driven_glb)
         return true;
   }
@@ -729,7 +723,8 @@ Placer::valid(int t)
   else
     assert((chipdb->tile_type[t] == TileType::RAMT) ||
            (chipdb->tile_type[t] == TileType::DSP0) ||
-           (chipdb->tile_type[t] == TileType::IPCON));
+           (chipdb->tile_type[t] == TileType::IPCON) ||
+           (chipdb->tile_type[t] == TileType::EMPTY));
   
   return true;
 }
@@ -1396,9 +1391,32 @@ Placer::configure()
       
       const Location &loc = chipdb->cell_location[cell];
       
+      // These are located in an empty tile so must be handled differrently
       if (models.is_warmboot(inst)) {
         placement[inst] = cell;
         continue;
+      } else if(models.is_hfosc(inst)) {
+        placement[inst] = cell;
+        const std::vector<std::pair<std::string, int> > hfosc_params =
+          {{"CLKHF_DIV", 2}};
+        configure_extra_cell(cell, inst, hfosc_params, true);
+
+        if(inst->find_port("CLKHF")->connected()) {
+          int driven_glb = chipdb->get_oscillator_glb(cell, "CLKHF");
+          
+          const auto &ecb = chipdb->extra_bits.at(fmt("padin_glb_netwk." << driven_glb));
+          conf.set_extra_cbit(ecb);
+        }
+        continue;      
+      } else if(models.is_lfosc(inst)) {
+        placement[inst] = cell;
+        if(inst->find_port("CLKLF")->connected()) {
+          int driven_glb = chipdb->get_oscillator_glb(cell, "CLKLF");
+          
+          const auto &ecb = chipdb->extra_bits.at(fmt("padin_glb_netwk." << driven_glb));
+          conf.set_extra_cbit(ecb);
+        }
+        continue;      
       }
 
       int t = loc.tile();
@@ -1582,12 +1600,6 @@ Placer::configure()
           }
         }
         
-      } else if(models.is_hfosc(inst)) {
-        const std::vector<std::pair<std::string, int> > hfosc_params =
-          {{"CLKHF_DIV", 2}};
-        configure_extra_cell(cell, inst, hfosc_params, true);
-      } else if(models.is_lfosc(inst)) {
-        //nothing to configure
       } else if(models.is_spram(inst)) {
         CBit spramen_cb = chipdb->extra_cell_cbit(cell, "SPRAM_ENABLE");
         conf.set_cbit(spramen_cb, true);
