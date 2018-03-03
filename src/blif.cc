@@ -29,7 +29,7 @@
 class BlifParser : public LineParser
 {
   BitVector stobv(const std::string &s_);
-  
+  bool radiant_stobv(const std::string &s_, BitVector &out);
 public:
   BlifParser(const std::string &f, std::istream &s_)
     : LineParser(f, s_)
@@ -57,6 +57,84 @@ BlifParser::stobv(const std::string &s_)
         fatal("invalid character in integer constant");
     }
   return bv;
+}
+
+inline int getNumericValue(char c) {
+  c = toupper(c);
+  if ((c >= '0') && (c <= '9'))
+    return c - '0';
+  else if ((c >= 'A') && (c <= 'Z'))
+    return (c - 'A') + 10;
+  else
+    return -1;
+}
+
+bool
+BlifParser::radiant_stobv(const std::string &s_, BitVector &out) {
+  if (s_.length() > 0)
+    {
+      size_t offset = 0;
+      int base = 10;
+      int log2base = -1;
+      if (s_.size() >= 2)
+        {
+          if (s_[offset] == '0')
+            {
+              offset++;
+              if (s_[offset] == 'x')
+                {
+                  base = 16;
+                  log2base = 4;
+                  offset++;
+                }
+              else if (s_[offset] == 'b')
+                {
+                  base = 2;
+                  log2base = 1;
+                  offset++;
+                }
+              else
+              {
+                log2base = 3;
+                base = 8;
+              }
+            }
+        }
+
+        if (base == 10)
+          {
+            uint64_t intval = 0;
+            while (offset < s_.length())
+              {
+                 int cval = getNumericValue(s_[offset]);
+                 if (cval == -1)
+                   return false;
+                 if ((intval * 10 + cval) < intval)
+                   fatal("decimal integer overflow in parameter");
+                 intval = intval * 10 + cval;
+                 offset++;
+              }
+            out = BitVector(64, intval);
+          }
+        else
+          {
+            int n = s_.length() - offset;
+            out.resize(n);
+            for(int i = 0; i < n; i++)
+              {
+                int cval = getNumericValue(s_[s_.length() - (1 + i)]);
+                if (cval == -1)
+                  return false;
+                for (int j = 0; j < log2base; j++)
+                 {
+                   out[i * log2base + j] = (cval & (1 << j)) != 0;
+                 }
+              }
+          }
+    } 
+  else
+    return false;
+  return true;
 }
 
 Design *
@@ -275,8 +353,15 @@ BlifParser::parse()
               if (words[2][0] == '"')
                 {
                   assert(words[2].back() == '"');
-                  inst->set_param(words[1], 
-                                  Const(lp, words[2].substr(1, words[2].size() - 2)));
+                  // Radiant uses numeric literals inside strings, so we have to consider them
+                  // for compatibility
+                  BitVector rad_bit;
+                  if(radiant_stobv(words[2].substr(1, words[2].size() - 2), rad_bit))
+                    inst->set_param(words[1],
+                                    Const(lp, rad_bit));
+                  else
+                    inst->set_param(words[1], 
+                                    Const(lp, words[2].substr(1, words[2].size() - 2)));
                 }
               else
                 {
